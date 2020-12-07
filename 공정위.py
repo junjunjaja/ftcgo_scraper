@@ -1,3 +1,4 @@
+from hyperparam import *
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -20,8 +21,8 @@ import re
 import pdftotext
 import string
 from contextlib import suppress
-#downpath =r"C:\Users\junlee\Downloads"
-downpath =r"C:\Users\junlee\Desktop\CODE\Python\corona\ftc_go_file"
+from selenium import webdriver
+
 def chromeoptionset():
     #option 추가 할거 있으면 여기 하기
     options = webdriver.ChromeOptions()
@@ -39,6 +40,12 @@ def chromeoptionset():
         'profile.default_content_setting_values.automatic_downloads': 1
     })
     return options
+
+
+options = chromeoptionset()
+#chromedriver_ver86.exe
+url = 'https://case.ftc.go.kr/ocp/co/ltfr.do'
+
 
 def str예외처리(name):
     name = name.replace("］", "]").replace("?","_")
@@ -439,13 +446,8 @@ if __name__ =="__main__":
     file_pdf = pdf_처리(changed)
     n__, dat = 문서추출(file_pdf)
     """
-    imp_time1 = 3 #3초 기다림
-    imp_time2 = 8 #5초 기다림
-    imp_time3 = 5 #5초 기다림
+    driver = webdriver.Chrome(origin_path + "/chromedriver_ver86.exe", chrome_options=options)
 
-    options = chromeoptionset()
-    driver = webdriver.Chrome(r"C:\Users\junlee\Desktop\CODE\Python\chromedriver_ver86.exe",chrome_options=options)
-    url = 'https://case.ftc.go.kr/ocp/co/ltfr.do'
     action = ActionChains(driver) #드라이버에 특정 입력 key(action) 전달
 
     driver.get(url) #url 접속
