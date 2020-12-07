@@ -1,0 +1,16 @@
+# : comments
+!*.py
+*.exe
+*.ini
+*.xlsx
+*.ipynb
+.idea/
+.ipynb_checkpoints/
+pre_clean_df/
+ftc_go_file/
+clean_df/
+complete_df
+pickle/
+휴장일/
+__pycache__/
+*.pdf
