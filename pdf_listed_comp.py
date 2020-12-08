@@ -49,7 +49,9 @@ def get_tickers(save=False):
     tickers = [stock.get_market_ticker_list(f"{y}0225") for y in range(1985,2021)]
     tickers = pd.concat(tickers)
     tickers = tickers.drop_duplicates()
-    tickers["name"] = tickers.apply(lambda x: stock.get_market_ticker_name(x))
+    name = tickers.apply(lambda x: stock.get_market_ticker_name(x))
+    tickers = pd.concat([tickers,name],axis=1)
+    tickers.columns = ["ticker","name"]
     tickers["name"] = tickers["name"].apply(strip)
     if save:
         tickers.to_pickle(피클경로+"tickers.pickle")
@@ -66,7 +68,6 @@ def firm_exist_1(string,tickers,strip_=True):
         return a
     else:
         return pd.NaT
-
 def firm_exist_2(string,tickers,strip_=False):
     if strip_:
         a = [name for name in tickers["name"].tolist() if find_voca(voca_re_make(name),strip(string)) is not None]
@@ -97,8 +98,35 @@ if __name__ == "__main__":
     c["사건명_기업"] = b["사건명"].astype(str).apply(lambda x: firm_exist_2(x, tickers))
     c["세부조치_기업"] = b["세부조치내역"].astype(str).apply(lambda x: firm_exist_2(x, tickers))
     c.to_pickle(피클경로 + "c.pickle")
-    d = pd.concat([c["피심인_기업"],b["피심인_기업"]],axis=1)
+    b = pd.read_pickle(피클경로 + "b.pickle")
+    c = pd.read_pickle(피클경로 + "c.pickle")
 
+    b = pd.read_pickle(피클경로 + "b.pickle")
+    c = pd.read_pickle(피클경로 + "c.pickle")
+    b_ = b[["피심인_기업", "사건명_기업", "세부조치_기업"]]
+    c = c.fillna("").apply(lambda x: x.apply(lambda x: ",".join(x)))
+    b_ = b_.fillna("").apply(lambda x: x.apply(lambda x: ",".join(x)))
+    c = c["피심인_기업"] + "," + c["사건명_기업"]
+    c = c.apply(lambda x: list(set(x.split(",")) - set([""])))
+    b["해당기업"] = c
+    b = b.drop(["피심인_기업", "사건명_기업", "세부조치_기업"], axis=1)
+    b = b.dropna(subset=["해당기업"])
+    tickers = tickers.set_index("name")
+    a = []
+    for n, i in b.iterrows():
+        기업 = i["해당기업"]
+        for j in 기업:
+            k = i.to_dict()
+            k["해당기업"] = j
+            try:
+                k["기업ticker"] = tickers.loc[j][0]
+            except:
+                k["기업ticker"] = ""
+            a.append(k)
+    a = pd.DataFrame.from_dict(a)
+    a = pd.DataFrame.from_dict(a)
+    a = a.rename(columns={"Unnamed: 0": "origin_index"})
+    a.to_excel("상장기업정리.xlsx")
 
 
     def cleansing(file):
