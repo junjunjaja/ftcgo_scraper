@@ -1,7 +1,7 @@
-
+down_path = r"C:\Users\junlee\Downloads"
 origin_path = "G:/내 드라이브/CODE/공정위scraper"
 raw_pdf_downpath = origin_path + r"/ftc_go_file"
-downpath = origin_path + r"/pre_clean_df"
+pre_clean_path = origin_path + r"/pre_clean_df"
 
 피클경로 = "pickle/"
 clean_df = 'clean_df/'

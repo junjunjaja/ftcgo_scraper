@@ -1,4 +1,5 @@
 from hyperparam import *
+import gc
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -22,29 +23,8 @@ import pdftotext
 import string
 from contextlib import suppress
 from selenium import webdriver
-
-def chromeoptionset():
-    #option 추가 할거 있으면 여기 하기
-    options = webdriver.ChromeOptions()
-    #options.add_argument('headless')
-    options.add_argument("disable-gpu")
-    options.add_argument("lang=ko_KR")  # 한국어!
-    #options.add_argument("proxy-server=localhost:8080")
-    options.add_argument(
-        "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36")
-    options.add_experimental_option("prefs", {
-        "download.default_directory": downpath,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": False,
-        'profile.default_content_setting_values.automatic_downloads': 1
-    })
-    return options
-
-
-options = chromeoptionset()
-#chromedriver_ver86.exe
-url = 'https://case.ftc.go.kr/ocp/co/ltfr.do'
+import shutil
+from time import sleep
 
 
 def str예외처리(name):
@@ -108,75 +88,105 @@ def 공정위boxcrawling(driver,pdf파일처리여부 = True):
             return True
         else:
             return False
+    def table추출(n,tr):
+        의결dic, 의결서 = tablerow추출(tr)
+        lst = [i.text for i in 의결dic.values()]
+        추가dic = {i: k for i, k in zip(의결dic.keys(), lst)}
+        if lst[0] != "":
+            if n == 0:
+                lst.append("filename")
+                colnames = lst
+                return True,의결dic, 의결서, lst, 추가dic,colnames
+            return True,의결dic, 의결서,lst,추가dic
+        else:
+            print(lst)
+            time.sleep(1)
+            return False,의결dic, 의결서,lst,추가dic
+    def changedname만들기(의결서,의결dic):
+        down_file_name = 의결서.find_element_by_class_name("down_files.pdf").get_attribute("title").split("pdf")[0] + "pdf"
+        down_file_name = str예외처리(down_file_name)
+        changed = 파일이름change(**의결dic, down_file_name=down_file_name)
+        return down_file_name,changed
+    def 다운여부파악(changed,down_file_name,path=raw_pdf):
+        """
+        downed_all 목록안에 changed 가 있으면 --> 바로 pdf 추출
+        downed_all 목록안에 down_file_name만 있으면 --> 이름 변경 뒤 pdf 추출
+        downed_all 목록안에 아무것도 없으면 클릭해서 download
+        """
+        downed_all = list(map(str예외처리, os.listdir(path)))
+        if changed in downed_all:
+            return "완료"
+        elif down_file_name in downed_all:
+            return "이름변경필요"
+        else:
+            return "다운필요"
+
     다운_오류 = []
     파일명변경오류 = []
     파일_오류 = []
+    추출오류 = []
     시정_약 = []
     시정_나 = []
     나머지 = []
     재결 = []
     for n,tr in enumerate(driver.find_elements_by_css_selector("tr")):
-        의결dic, 의결서 = tablerow추출(tr)
-        lst = [i.text for i in 의결dic.values()]
-        추가dic = {i:k for i,k in zip(의결dic.keys(),lst)}
-        if n==0:
-            lst.append("filename")
-            colnames = lst
-        else:
-            down_file_name = 의결서.find_element_by_class_name("down_files.pdf").get_attribute("title").split("pdf")[0] + "pdf"
-            down_file_name = str예외처리(down_file_name)
-
-            changed = 파일이름change(**의결dic,down_file_name=down_file_name)
-            if 예외처리(changed):
-                다운_오류.append(changed)
-                continue
-
-            기존downed_all = set(map(str예외처리, os.listdir(downpath)))
-            #row_data = {c: i for c, i in zip(colnames, lst)}
-            while True:
-                if is_download_finished(downpath,files = [changed]):
-                    break
+        if n == 0:
+            ok, 의결dic, 의결서,lst, 추가dic, colnames = table추출(n, tr)
+            continue
+        while True:
+            True, 의결dic, 의결서, lst, 추가dic
+            ok,의결dic, 의결서,lst,추가dic = table추출(n, tr)
+            if ok:
+                break
+        down_file_name,changed = changedname만들기(의결서, 의결dic)
+        if 예외처리(changed):
+            다운_오류.append(changed)
+            continue
+        기존downed_all = set(map(str예외처리, os.listdir(down_path)))
+        downed_all = list(map(str예외처리, os.listdir(raw_pdf)))
+        while True:
+            여부 = 다운여부파악(changed, down_file_name)
+            if 여부 == "완료":
+                완료 =True
+                break
+            elif 여부 == "이름변경필요":
+                try:
+                    shutil.move(os.path.join(raw_pdf, down_file_name), os.path.join(raw_pdf, changed))
+                except:
+                    pass
+            else:
+                완료 = False
+                break
+        while not 완료:
+            여부 = 다운여부파악(changed, down_file_name, path=down_path)
+            if 여부 == "다운필요":
+                clicked = 의결서_click(driver, 의결서, n)
+                무의미한클릭(action, driver)
+                if clicked:
+                    time.sleep(1)
                 else:
-                    clicked = 의결서_click(driver, 의결서,n)
-                    무의미한클릭(action, driver)
-
-                    #driver.implicitly_wait(imp_time1)
-                    #help(driver.implicitly_wait)
-                    if clicked:
-                        break
-            while not is_download_finished(downpath,files = [changed]):
-                downed_all = set(map(str예외처리, os.listdir(downpath)))
-                down완료 = list(downed_all - 기존downed_all)
-                if len(down완료) >= 1 and ".pdf" in down완료[0] and ".crdownload" not in down완료[0]:
-                    #downed = is_download_finished(downpath,files = [down_file_name])
-                    downed_all = list(map(str예외처리, os.listdir(downpath)))
-                    if down완료[0] != down_file_name:
-                        down_file_name = down완료[0]
-                        changed = 파일이름change(**의결dic, down_file_name=down_file_name)
-                    lst.insert(len(lst), changed)
-                    break
-            while True:
-                downed_all = list(map(str예외처리, os.listdir(downpath)))
-                #파일이름 바꾸기
-                if down_file_name in downed_all:
-                    if changed not in downed_all:
-                        try:
-                            os.rename(os.path.join(downpath, down_file_name), os.path.join(downpath, changed))
-                        except:
-                            파일명변경오류.append(changed)
-                            break
-                            #continue
-                        downed_all = list(map(str예외처리, os.listdir(downpath)))
-                    else:
-                        downed_all = list(map(str예외처리, os.listdir(downpath)))
-                        break
-                if changed in downed_all:
-                    break
-            if pdf파일처리여부:
-                if changed in downed_all:
-                    file_pdf = pdf_처리(changed)
-                    try:
-                        n__, dat = 문서추출(file_pdf,changed)
+                    time.sleep(1)
+            elif 여부 == "이름변경필요":
+                try:
+                    shutil.move(os.path.join(down_path, down_file_name), os.path.join(raw_pdf, changed))
+                except:
+                    pass
+                else:
+                    완료 = True
+            elif 여부 == "완료":
+                try:
+                    shutil.move(os.path.join(down_path, changed), os.path.join(raw_pdf, changed))
+                except:
+                    pass
+                else:
+                    완료 = True
+        downed_all = list(map(str예외처리, os.listdir(raw_pdf)))
+        if pdf파일처리여부:
+            if changed in downed_all:
+                file_pdf = pdf_처리(changed,downpath = raw_pdf)
+                try:
+                    ok,n__,dat = 문서추출(file_pdf,changed)
+                    if ok:
                         dat.update(추가dic)
                         dat.update({"파일명": changed})
                         if "시정" in n__:
@@ -188,22 +198,24 @@ def 공정위boxcrawling(driver,pdf파일처리여부 = True):
                             재결.append(dat)
                         else:
                             나머지.append(dat)
-                    except:
-                        파일_오류.append(changed)
-                        continue
+                    else:
+                        추출오류.append(changed)
+                except:
+                    파일_오류.append(changed)
+                    continue
     if pdf파일처리여부:
-        오류 = {"다운오류" : 다운_오류,"파일명변경오류" : 파일명변경오류,"파일오류" : 파일_오류}
+        오류 = {"다운오류" : 다운_오류,"파일명변경오류" : 파일명변경오류,"파일오류" : 파일_오류,"추출오류" :추출오류}
         return True,시정_약,시정_나,재결,나머지,오류
     else:
         return True
-def pdf_처리(pdf_name,downpath = downpath,n = None):
+def pdf_처리(pdf_name,downpath = raw_pdf,n = None):
     file = open(downpath+"\\"+pdf_name, 'rb')
     fileReader = pdftotext.PDF(file)
     file = ""
     if n is None:
         n = len(fileReader)
     for i in range(n):
-        file += re.compile("- {0,}[0-9] {0,}- {0,}").sub("",fileReader[i]) + f" - {i} - "
+        file += re.compile("- *[0-9] *- *").sub("",fileReader[i]) + f" - {i} - "
     file = cleansing(file)
     return file
 def cleansing(file):
@@ -220,17 +232,17 @@ def clean_text_blank(file):
 def 글자사이공백넣기(글자):
     a = 글자[0]
     for i in 글자[1:]:
-        a += r" {0,}" + i
-    return a
+        a += r" *" + i
+    return a+r"\b"
 def mcomp(name_list):
-    a = ""
+    a = "("
     for i in name_list:
         a +="("
         a += 글자사이공백넣기(i)
         a += ")"
         if i != name_list[-1]:
             a += "|"
-    return a
+    return a+")"
 def 문서추출(file,pdf_name):
     def redict만들기(name):
         remat = []
@@ -239,9 +251,12 @@ def 문서추출(file,pdf_name):
                 if i[:2] == "a_":
                     _ = re.compile(글자사이공백넣기(i[2:])+r" {2,}")
                 else:
-                    _ = re.compile(글자사이공백넣기(i) + "\s{0,}:{0,}\s{0,}")
+                    if "\\" in i:
+                        _ = re.compile(i)
+                    else:
+                        _ = re.compile(글자사이공백넣기(i) + "\s*:\s*")
             else:
-                _ =re.compile(mcomp(i)+" {0,}:{0,} {0,}")
+                _ =re.compile(mcomp(i)+" *:* *")
             remat.append(_)
         #remat = [re.compile(글자사이공백넣기(i)+" ?:? ?") if isinstance(i,str) else re.compile(mcomp(i)+" ?:? ?") for i in name]
         rematdict = {}
@@ -251,6 +266,8 @@ def 문서추출(file,pdf_name):
             else:
                 if i[:2] == "a_":
                     i = i[2:]
+                if "\\" in i:
+                    i = re.compile("[^가-힣]*").sub("",i)
                 rematdict[i] = j
         return rematdict
     def find순서(start,rematdict,file=file):
@@ -307,10 +324,20 @@ def 문서추출(file,pdf_name):
                     꼭포함 = 꼭포함
                     break
         try:
+            rematdict[꼭포함] = re.compile(r'\s+\b주 *문\b\s+')
             최소값 = rematdict[꼭포함].search(file).end()
         except:
-            최소값
-        page_split = [i.end() for i in re.compile("- {0,}[0-9]{1,} {0,}- {0,}").finditer(file)]
+            new_dict = {}
+            new_dict["시정권고"] = rematdict["시정권고"]
+            new_dict["사건번호"] = rematdict["사건번호"]
+            new_dict["사건명"] = rematdict["사건명"]
+            new_dict["피심인"] = rematdict["피심인"]
+            new_dict["시정권고사항"] = re.compile(r"주 *문\b *")
+            new_dict["시정권고이유"] = re.compile(글자사이공백넣기("사실의개요"))
+            for 꼭포함 in ["피심인","시정권고사항", "시정권고이유"]:
+                    if new_dict[꼭포함].search(file) is not None:
+                       최소값 = new_dict[꼭포함].search(file).end()
+        page_split = [i.end() for i in re.compile("- *[0-9]+ *- *").finditer(file)]
         최소포함page = 0
         for i in page_split:
             if i <=최소값:
@@ -340,26 +367,31 @@ def 문서추출(file,pdf_name):
         #a = [file[i[0]:i[1]].replace(" ","") for i in end]
         return __name,end
     file_type = []
-    file_type.append(re.compile(글자사이공백넣기("시정권고서")))
-    file_type.append(re.compile("의 {0,}결 {0,}(\( {0,}약 {0,}\)) {0,}제 {0,}([0-9]{1,5})"))
-    file_type.append(re.compile("의 {0,}결 {0,}(\( {0,}임 {0,}\)) {0,}제 {0,}([0-9]{1,5})"))
-    file_type.append(re.compile(글자사이공백넣기("재결제") + r" {0,}([0-9]{1,5})"))
-    file_type.append(re.compile(r"결 {0,}정 {0,}(\( {0,}약 {0,}\) {0,}){0,} {0,}제 {0,}([0-9]{1,5})"))
-    file_type.append(re.compile(글자사이공백넣기("의결제") + r" {0,}([0-9]{1,5})"))
-    #a_붙은 단어는 그 딱 그 단어 자체만 찾음
-    시권_약관 = ["시정권고", "사건번호", "사건명", ["피조사인","피청구인", "피심인"],["위피조사인의","위피청구인의","위피심인의"] ,\
+    file_type.append(re.compile(r"("+글자사이공백넣기("시정권고서")+"(?: *제 *(?:[0-9]{1,5}))?" +r")|(" +글자사이공백넣기("시정권고") + "(?: *제 *(?:[0-9]{1,5}))?" + r")"))
+    file_type.append(re.compile(r"\b의 *결 *(\(? *약 *\)?) *제 *([0-9]{1,5})"))
+    file_type.append(re.compile(r"\b의 *결 *(\(? *임 *\)?) *제 *([0-9]{1,5})"))
+    file_type.append(re.compile(r"\b재 *결 *제 *([0-9]{1,5})"))
+    file_type.append(re.compile(r"결 *정 *(\(? *약 *\)? *)? *제 *([0-9]{1,5})"))
+    file_type.append(re.compile(r"(?:의 *결 *제 *(?:[0-9]{1,5}))"+r"|(?:의 *결 *\(*시 *정 *명 *령 *\)* *)"))
+    #a_붙은 단어는 그 딱 그 단어 자체만 찾음 ["위피조사인의","위피청구인의","위피심인의",
+    시권_약관 = ["시정권고", "사건번호", "사건명", ["수신","피조사인","피청구인", "피심인"],r"위 *\w+의 *",\
           "a_시정권고사항","a_시정권고이유", "a_적용법조"]
     시권_나머지 =["시정권고", "사건번호", "사건명", ["피조사인","피청구인", "피심인"],["위피조사인의","위피청구인의","위피심인의"] ,\
           "a_시정권고사항","법위반내용",["법령의적용","적용법조"],"시정기한","수락여부통지기간" ,["수락거부시의조치","수락거부시조치"]]
-    의결_ = ["사건번호", "사건명", ["피조사인", "신청인", "피심인"], "a_원심결", "a_심의종결일", "a_주문", "a_신청취지", "a_이유"]
-    page_split = re.compile("- {0,}[0-9] {0,}- {0,}")
-    page_one_file = file[:re.compile("- {0,}[0-9]{1,} {0,}- {0,}").search(file).end()]
+    의결_ = [r"\s+\b사 *건 *번 *호\b\s+", r"\s+\b사 *건 *명\b\s+", ["피조사인", "신청인", "피심인"], r"\s+\b원 *심 *결\b\s+", r"\s+\b심 *의 *종 *결 *일\b\s+", r"\s+\b주 *문\b\s+", r"\s+\b신 *청 *취 *지\b\s+", r"\s+\b이 *유\b\s+"]
+    page_split = re.compile("- *[0-9] *- *")
+    page_one_file = file[:re.compile("- *[0-9]+ *- *").search(file).end()]
     for file_name,typ in zip(["시정","약식","임시","재결","결정","의결"],file_type):
-        #print(typ.search(file))
         if typ.search(page_one_file) is not None:
+            #print(typ.search(page_one_file),file_name)
             if file_name == "시정":
-                file = re.compile("시 {0,}정 {0,}권 {0,}고 {0,}서 {0,}").subn("",file,1)[0]
-                시권_typ = re.search(r"[0-9]{2,5}(\w{2})",pdf_name.split("@@")[-1]).group(1)
+                file = re.compile("시 *정 *권 *고 *서 *").subn("",file,1)[0]
+                try:
+                    시권_typ = re.search(r"[0-9]{2,5}(\w{2})",pdf_name.split("@@")[-1]).group(1)
+                except:
+                    시권_typ = re.search(r"(\w{2})[0-9]{2,5}", pdf_name.split("@@")[1]).group(1)
+                    if 시권_typ == "시권":
+                        시권_typ = "약관"
                 if 시권_typ == "약관":
                     name = 시권_약관
                 else:
@@ -376,9 +408,17 @@ def 문서추출(file,pdf_name):
                 else:
                     data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("",file[i[1]:]))
             if len(data) == 0:
+                data = "내용추출실패"
+                print(typ.search(page_one_file), file_name)
                 print(data)
-            return file_name,data
-
+                print(pdf_name)
+                return False, file_name, data
+            else:
+                return True,file_name,data
+    data = "항목추출실패"
+    print(data)
+    print(pdf_name)
+    return False, file_name, data
 
 def 데이터매치check(사건번호,의결번호,의결일):
     re의결일 = re.compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}")
@@ -415,7 +455,7 @@ def 다음페이지로이동(driver,page):
         return False
 if __name__ =="__main__":
     """
-    downed_all = list(map(str예외처리, os.listdir(downpath)))
+    downed_all = list(map(str예외처리, os.listdir(pre_clean_path)))
     시정_약관 = []
     시정_나머지 = []
     재결 = []
@@ -446,6 +486,30 @@ if __name__ =="__main__":
     file_pdf = pdf_처리(changed)
     n__, dat = 문서추출(file_pdf)
     """
+
+
+    def chromeoptionset():
+        # option 추가 할거 있으면 여기 하기
+        options = webdriver.ChromeOptions()
+        # options.add_argument('headless')
+        options.add_argument("disable-gpu")
+        options.add_argument("lang=ko_KR")  # 한국어!
+        # options.add_argument("proxy-server=localhost:8080")
+        options.add_argument(
+            "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36")
+        options.add_experimental_option("prefs", {
+            #"download.default_directory": down_path,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": False,
+            'profile.default_content_setting_values.automatic_downloads': 1
+        })
+        return options
+
+    options = chromeoptionset()
+    # chromedriver_ver86.exe
+    url = 'https://case.ftc.go.kr/ocp/co/ltfr.do'
+
     driver = webdriver.Chrome(origin_path + "/chromedriver_ver86.exe", chrome_options=options)
 
     action = ActionChains(driver) #드라이버에 특정 입력 key(action) 전달
@@ -455,8 +519,8 @@ if __name__ =="__main__":
     driver.maximize_window()
     #page_num = driver.find_elements_by_class_name("paginate_button.current")[0].text
 
-    down_start_page = 1799
-    end_page_num = 1961
+    down_start_page = 0
+    end_page_num = 1962
     나머지_col = ["문서타입", "사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "주문","원심결","신청취지", "심의종결일", "파일명", "이유"]
     재결_col = ["문서타입", "사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "주문", "원심결","신청취지", "심의종결일", "파일명", "이유"]
     시정_약관_DF_col = ['문서타입', '사건번호',"의결번호",'사건명', '시정권고',"의결일", '피심인','시정권고사항', '적용법조',"파일명", '시정권고이유', '위피심인의']
@@ -474,8 +538,6 @@ if __name__ =="__main__":
                 break
         while True:
             if i >= down_start_page:
-                if i >= 1269:
-                    페이지이동
                 다운로드, 시정_약,시정_나,재결,나머지,오류 = 공정위boxcrawling(driver)
                 if 다운로드:
                     시정_약관.extend(시정_약)
@@ -488,35 +550,41 @@ if __name__ =="__main__":
             else:
                 break
 
-        if (i % 200 == 0)and (i > down_start_page):
-            import numpy as np
+        if (i % 100 == 0)and (i > down_start_page):
             나머지_DF_ = pd.DataFrame.from_dict(나머지_DF).reset_index(drop=True)
             나머지_DF_= 나머지_DF_.reindex(columns=나머지_col).rename(columns={"주문": "세부조치내역"})
-            나머지_DF_.to_csv(f"의결서_to{i}.csv", encoding="UTF-8")
+            나머지_DF_.to_excel(f"{pre_clean}의결서_to{i}.xlsx", encoding="UTF-8")
             del 나머지_DF_
             if len(재결_DF) >0:
                 재결_DF_ = pd.DataFrame.from_dict(재결_DF).reset_index(drop=True)
                 재결_DF_ = 재결_DF_.reindex(columns=재결_col).rename(columns={"주문": "세부조치내역"})
-                재결_DF_.to_csv(f"재결_to{i}.csv", encoding="UTF-8")
+                재결_DF_.to_excel(f"{pre_clean}재결_to{i}.xlsx", encoding="UTF-8")
                 del 재결_DF_
             if len(시정_약관) >0:
                 시정_약관_DF_ = pd.DataFrame.from_dict(시정_약관).reset_index(drop=True)
                 시정_약관_DF_ = 시정_약관_DF_.reindex(columns=시정_약관_DF_col)
-                시정_약관_DF_.to_csv(f"시정_약관_to{i}.csv", encoding="UTF-8")
+                시정_약관_DF_.to_excel(f"{pre_clean}시정_약관_to{i}.xlsx", encoding="UTF-8")
                 del 시정_약관_DF_
             if len(시정_나머지) >0:
                 시정_나머지_DF_ = pd.DataFrame.from_dict(시정_나머지).reset_index(drop=True)
                 시정_나머지_DF_ = 시정_나머지_DF_.reindex(columns=시정_나머지_DF_col)
-                시정_나머지_DF_.to_csv(f"시정_나머지_to{i}.csv", encoding="UTF-8")
+                시정_나머지_DF_.to_excel(f"{pre_clean}시정_나머지_to{i}.xlsx", encoding="UTF-8")
                 del 시정_나머지_DF_
+            err = {_:[]for _ in 오류_all[0].keys()}
+            for _ in 오류_all:
+                for __ in err.keys():
+                    err[__].extend(_[__])
+            err = pd.concat([pd.Series(__,name=_) for _,__ in err.items()],axis=1)
+            if len(err) >=1:
+                err.dropna(how="all")
+                err.to_excel(f"{pre_clean}err_to{i}.xlsx", encoding="UTF-8")
             시정_약관 = []
             시정_나머지 = []
             재결_DF = []
             나머지_DF = []
-    import pickle
-
-    with open(f'오류.pickle', 'wb') as handle:
-        pickle.dump(오류_all, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            오류_all = []
+#    with open(f'오류.pickle', 'wb') as handle:
+#        pickle.dump(오류_all, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     #나머지_DF_["문서타입"].drop_duplicates()
     #재결_DF_["문서타입"].drop_duplicates()
@@ -526,7 +594,7 @@ if __name__ =="__main__":
 #pdf 추출 check 용 코드
 
 changed = "2020-09-10@@의결2020-259@@2018안정34785. 의결서(굿럭 경고심의요청).pdf"
-downed_all = list(map(str예외처리, os.listdir(downpath)))
+downed_all = list(map(str예외처리, os.listdir(pre_clean_path)))
     시정 = []
     나머지 = []
     for changed in downed_all:

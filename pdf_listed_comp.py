@@ -14,7 +14,7 @@ def find_voca(string,target):
 
 def load_complete_ftc_file(save=False):
     파일select = re.compile("\w+_to[0-9]{3,}\.csv")
-    파일select = [파일select.search(i).group() for i in os.listdir(downpath) if 파일select.search(i) is not None]
+    파일select = [파일select.search(i).group() for i in os.listdir(pre_clean_path) if 파일select.search(i) is not None]
     # ,usecols = list(range(0,14))
     나머지_col = ["사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "세부조치내역"]
     재결_col = ["사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "세부조치내역"]
@@ -38,7 +38,7 @@ def load_complete_ftc_file(save=False):
     for n, k, l in zip([나머지_col, 재결_col, 시정_약관_DF_col, 시정_나머지_DF_col], [의결서, 재결, 시정약관, 시정나머지],
                        ["의결서", "재결", "시정약관", "시정나머지"]):
         a = pd.concat(
-            [pd.read_csv(f"{downpath}\{i}", engine='python', encoding="UTF-8", index_col=0, verbose=True) for i in
+            [pd.read_csv(f"{pre_clean_path}\{i}", engine='python', encoding="UTF-8", index_col=0, verbose=True) for i in
              k], axis=0).reset_index().reindex(columns=n)
         if save:
             a.to_excel(f"{l}.xlsx")
