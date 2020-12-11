@@ -28,7 +28,7 @@ from time import sleep
 
 
 def str예외처리(name):
-    name = name.replace("］", "]").replace("?","_")
+    name = name.replace("］", "]").replace("?","_").replace("~","_")
     return name
 def is_download_finished(temp_folder,files = None):
     #file이 없을때는 모두 download가 완료되었는지 check
@@ -84,7 +84,10 @@ def 무의미한클릭(action,driver):
 
 def 공정위boxcrawling(driver,pdf파일처리여부 = True):
     def 예외처리(down_file_name):
-        if down_file_name in ["2009-06-23@@시권2009-040@@2009특수1282시정권고서(한국사미트).pdf","2009-04-07@@약식2009-094@@2008경규4233의결서 안[중앙일보미디어마케팅(주)(마포은평지점 망원센터)].pdf"]:
+        if down_file_name in ["2009-06-23@@시권2009-040@@2009특수1282시정권고서(한국사미트).pdf","2009-04-07@@약식2009-094@@2008경규4233의결서 안[중앙일보미디어마케팅(주)(마포은평지점 망원센터)].pdf"
+                              ,"1995-08-01@@의결1995-171@@9507조2일605의결95-171.pdf","1994-12-19@@의결1994-408@@9410공동654의결94-408.pdf","1994-11-26@@시권1994-213@@9411약관710시권94-213.pdf",
+                              "1994-10-25@@시권1994-190@@9408약관512시권94-190.pdf","1994-09-05@@시권1994-134@@9407약관433시권94-134.pdf","1994-08-25@@시권1994-129@@9405제도303시권94-129.pdf",
+                              ""]:
             return True
         else:
             return False
@@ -204,7 +207,7 @@ def 공정위boxcrawling(driver,pdf파일처리여부 = True):
                     파일_오류.append(changed)
                     continue
     if pdf파일처리여부:
-        오류 = {"다운오류" : 다운_오류,"파일명변경오류" : 파일명변경오류,"파일오류" : 파일_오류,"추출오류" :추출오류}
+        오류 = {"다운오류" : 다운_오류,"파일명변경오류" : 파일명변경오류,"파일오류" : 파일_오류, "추출오류" : 추출오류}
         return True,시정_약,시정_나,재결,나머지,오류
     else:
         return True
@@ -357,28 +360,90 @@ def 문서추출(file,pdf_name):
             if n == (len(ls)-1):
                 new_remat[k] = i
         return new_remat
-    def cleanredict(name,file=file):
-        start = []
+    def cleanredict(name,onlypage1 = True,file=file):
+        start = {}
         rematdict = redict만들기(name)
-        rematdict = 페이지1내에있는것확인(file, rematdict)
-        for i in rematdict.values():
-            start.append([(m.start(0), m.end(0)) for m in i.finditer(file)])
-        end,__name = find순서(start,rematdict)
+        if onlypage1:
+            rematdict = 페이지1내에있는것확인(file, rematdict)
+        for n,i in rematdict.items():
+            if "선택" in n:
+                rematdict[n] = re.compile(rematdict[n].pattern.replace("선택",""))
+                i = rematdict[n]
+            start[n] = ([(m.start(0), m.end(0)) for m in i.finditer(file)])
+        pop_ = []
+        for n,i in start.items():
+            if len(i)==0:
+                pop_.append(n)
+        for i in pop_:
+            start.pop(i)
+        new_rematdict = start
+        start = [i for i in start.values()]
+        end,__name = find순서(start,new_rematdict)
         #a = [file[i[0]:i[1]].replace(" ","") for i in end]
         return __name,end
+    def 문서추출2(file,pdf_name):
+        file_type = []
+        #96년도대 의결
+        file_name_ = ["고발","의결"]
+        file_type.append(re.compile(r"(?:고 *발 *제 *[0-9]{1,5} *호?\,? *\d{2,4}\s*\.?\s*\d{1,2}\s*\.?\s*\d{1,2}\s*\.?)"))
+        file_type.append(re.compile(r"(?: *[0-9]{1,5} *\-+ *[0-9]{1,5} *(시 *정 *명 *령)? *)"))
+        page_split = re.compile("- *[0-9] *- *")
+        page_one_file = file[:160]
+
+        의결_ = [r"\s+\b사 *건 *번 *호\b\s+", r"\s+\b사? *건 *명\s*:?\s*\b", ["피조사인", "신청인", "피심인"], r"\s+\b원 *심 *결\b\s+",
+               r"\s+\b심 *의 *종 *결 *일\b\s+",r"위 *\w+의 *" ,r"\s+\b주 *문\b\s+", r"\s+\b신 *청 *취 *지\b\s+","\s+인 *정 *하 *는 *사 *실\s*" ,r"\s+\b이 *유\b\s+",
+               r"선택\s+공\s*정\s*거\s*래\s*위\s*원\s*회\s*는\s*위\s*와\s*같\s*이\s*의\s*결\s*하\s*였\s*(다|음)", r"선택\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s+"]
+        고발_ = [r"\s+\b사 *건 *번 *호\b\s+", r"\s+\b사? *건 *명\s*:?\s*\b", ["피조사인", "신청인", "피심인"], r"\s+\b원 *심 *결\b\s+",
+               r"\s+\b심 *의 *종 *결 *일\b\s+",r"위 *\w+의 *" ,r"\s+\b주 *문\b\s+", r"\s+\b신 *청 *취 *지\b\s+","\s+인 *정 *하 *는 *사 *실\s*","\s+사 *실 *의 *개 *요 *" ,r"\s+\b이 *유\b\s+",
+               r"선택\s+공\s*정\s*거\s*래\s*위\s*원\s*회\s*는\s*위\s*와\s*같\s*이\s*의\s*결\s*하\s*였\s*(다|음)", r"선택\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s+"]
+        re.compile(r"\s+공\s*정\s*거\s*래\s*위\s*원\s*회\s*는\s*위\s*와\s*같\s*이\s*의\s*결\s*하\s*였\s*(다|음)").search('└────┴────────────┴────┴────┴──┴───┴──┘ 공정거래위원회는 위와같이 의결하였다. ')
+        for file_name,typ in zip(file_name_, file_type):
+            if typ.search(page_one_file) is not None:
+                #print(typ.search(page_one_file), file_name)
+                if file_name == "고발":
+                    name = 고발_
+                elif file_name == "의결":
+                    name = 의결_
+                a, end = cleanredict(name,onlypage1=False,file = file)
+                data = {}
+                data["문서타입"] = file_name
+                for n, da in enumerate(zip(end,a)):
+                    i,na = da
+                    if "선택" in na:
+                        data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("", file[i[0]:i[1]]))
+                    else:
+                        if n != (len(end) - 1):
+                            data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("", file[i[1]:end[n + 1][0]]))
+                        else:
+                            data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("", file[i[1]:]))
+                return True, file_name, data
+
+    if len(file) <= 100:
+        data = "내용추출실패"
+        file_name = "실패"
+        return False, file_name, data
+
     file_type = []
     file_type.append(re.compile(r"("+글자사이공백넣기("시정권고서")+"(?: *제 *(?:[0-9]{1,5}))?" +r")|(" +글자사이공백넣기("시정권고") + "(?: *제 *(?:[0-9]{1,5}))?" + r")"))
     file_type.append(re.compile(r"\b의 *결 *(\(? *약 *\)?) *제 *([0-9]{1,5})"))
     file_type.append(re.compile(r"\b의 *결 *(\(? *임 *\)?) *제 *([0-9]{1,5})"))
     file_type.append(re.compile(r"\b재 *결 *제 *([0-9]{1,5})"))
     file_type.append(re.compile(r"결 *정 *(\(? *약 *\)? *)? *제 *([0-9]{1,5})"))
-    file_type.append(re.compile(r"(?:의 *결 *제 *(?:[0-9]{1,5}))"+r"|(?:의 *결 *\(*시 *정 *명 *령 *\)* *)"))
+    file_type.append(re.compile(r"(?:의 *결 *제 *(?:[0-9]{1,5}))"+r"|(?:의 *결 *\(*시 *정 *명 *령 *\)* 제? *[0-9]{1,5} *호? *)"))
+    file_type.append(re.compile)
+
+
     #a_붙은 단어는 그 딱 그 단어 자체만 찾음 ["위피조사인의","위피청구인의","위피심인의",
-    시권_약관 = ["시정권고", "사건번호", "사건명", ["수신","피조사인","피청구인", "피심인"],r"위 *\w+의 *",\
+    시권_약관 = ["시정권고", "사건번호", r"\b사? *건 *명 *:? +", ["수신","피조사인","피청구인", "피심인"],r"위 *\w+의 *",\
           "a_시정권고사항","a_시정권고이유", "a_적용법조"]
-    시권_나머지 =["시정권고", "사건번호", "사건명", ["피조사인","피청구인", "피심인"],["위피조사인의","위피청구인의","위피심인의"] ,\
+    시권_나머지 =["시정권고", "사건번호", r"\b사? *건 *명 *:? +", ["피조사인","피청구인", "피심인"],r"위 *\w+의 *" ,\
           "a_시정권고사항","법위반내용",["법령의적용","적용법조"],"시정기한","수락여부통지기간" ,["수락거부시의조치","수락거부시조치"]]
-    의결_ = [r"\s+\b사 *건 *번 *호\b\s+", r"\s+\b사 *건 *명\b\s+", ["피조사인", "신청인", "피심인"], r"\s+\b원 *심 *결\b\s+", r"\s+\b심 *의 *종 *결 *일\b\s+", r"\s+\b주 *문\b\s+", r"\s+\b신 *청 *취 *지\b\s+", r"\s+\b이 *유\b\s+"]
+    의결_ = [r"\s+\b사 *건 *번 *호\b\s+", r"\s+\b사? *건 *명\s*:?\s*\b", ["피조사인", "신청인", "피심인"], r"\s+\b원 *심 *결\b\s+", r"\s+\b심 *의 *종 *결 *일\b\s+",r"위 *\w+의 *",r"\s+\b주 *문\b\s+", r"\s+\b신 *청 *취 *지\b\s+", r"\s+\b이 *유\b\s+"
+           ,"\s+인\s*정\s*하\s*는\s*사\s*실\s+", "\s+법\s*령\s*의\s*적\s*용\s+"
+           ,r"선택\s+공\s*정\s*거\s*래\s*위\s*원\s*회\s*는\s*위\s*와\s*같\s*이\s*의\s*결\s*하\s*였\s*(다|음)", r"선택\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s+"]
+    재결_ = [r"\s+\b사 *건 *번 *호\b\s+", r"\s+\b사? *건 *명\s*:?\s*\b", ["피조사인", "신청인", "피심인","이의신청인"], r"\s+\b원 *심 *결\b\s+", r"\s+\b심 *의 *종 *결 *일\b\s+",r"위 *\w+의 *",
+          r"\s+\b주 *문\b\s+",r"\s+이\s*의\s*신\s*청\s*요\s*지\s*및\s*판\s*단\s+",r"\s+신 *청 *취 *지\s+", r"\s+\b이 *유\b\s+","\s+인\s*정\s*하\s*는\s*사\s*실\s+","\s+법\s*령\s*의\s*적\s*용\s+"
+           r"선택\s+공\s*정\s*거\s*래\s*위\s*원\s*회\s*는\s*위\s*와\s*같\s*이\s*의\s*결\s*하\s*였\s*(다|음)", r"선택\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s+"]
     page_split = re.compile("- *[0-9] *- *")
     page_one_file = file[:re.compile("- *[0-9]+ *- *").search(file).end()]
     for file_name,typ in zip(["시정","약식","임시","재결","결정","의결"],file_type):
@@ -397,28 +462,40 @@ def 문서추출(file,pdf_name):
                 else:
                     name = 시권_나머지
                 file_name += 시권_typ
+            elif file_name =="재결":
+                name = 재결_
             else:
                 name = 의결_
-            a,end = cleanredict(name,file)
+            a,end = cleanredict(name,onlypage1 = False,file=file)
             data = {}
             data["문서타입"] = file_name
-            for n, i in enumerate(end):
-                if n != (len(end) - 1):
-                    data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("",file[i[1]:end[n + 1][0]]))
+            for n, da in enumerate(zip(end, a)):
+                i, na = da
+                if "선택" in na:
+                    data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("", file[i[0]:i[1]]))
                 else:
-                    data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("",file[i[1]:]))
+                    if n != (len(end) - 1):
+                        data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("", file[i[1]:end[n + 1][0]]))
+                    else:
+                        data[clean_text_blank(a[n])] = clean_text_blank(page_split.sub("", file[i[1]:]))
             if len(data) == 0:
-                data = "내용추출실패"
-                print(typ.search(page_one_file), file_name)
-                print(data)
-                print(pdf_name)
-                return False, file_name, data
+                try:
+                    ok, file_name, data = 문서추출2(file, pdf_name)
+                except:
+                    data = "내용추출실패"
+                    print(typ.search(page_one_file), file_name)
+                    print(data)
+                    print(pdf_name)
+                    return False, file_name, data
             else:
                 return True,file_name,data
-    data = "항목추출실패"
-    print(data)
-    print(pdf_name)
-    return False, file_name, data
+    try:
+        ok,file_name,data = 문서추출2(file, pdf_name)
+    except:
+        data = "항목추출실패"
+        print(data)
+        print(pdf_name)
+        return False, file_name, data
 
 def 데이터매치check(사건번호,의결번호,의결일):
     re의결일 = re.compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}")
@@ -445,14 +522,24 @@ def tablerow추출(tr):
     return {"사건번호":사건번호,"의결번호":의결번호,"사건명":사건명,"대표조치유형":대표조치유형,"의결일":의결일},의결서
 
 
-def 다음페이지로이동(driver,page):
-    try:
-        driver.find_elements(By.XPATH, f"//*[@id='ltfrList_paginate']/span/a[text()='{page}']")[0].click()
-        unt = EC.text_to_be_present_in_element((By.CLASS_NAME,"paginate_button.current"),str(page))
-        WebDriverWait(driver, 5).until(unt)
-        return True
-    except:
-        return False
+def 다음페이지로이동(driver,page,end_page_num):
+    if type(page) is int:
+        try:
+            driver.find_elements(By.XPATH, f"//*[@id='ltfrList_paginate']/span/a[text()='{page}']")[0].click()
+            unt = EC.text_to_be_present_in_element((By.CLASS_NAME,"paginate_button.current"),str(page))
+            WebDriverWait(driver, 5).until(unt)
+            return True
+        except:
+            return False
+    else:
+        try:
+            driver.find_elements(By.XPATH, f"//*[@id='ltfrList_last']")[0].click()
+            unt = EC.text_to_be_present_in_element((By.CLASS_NAME,"paginate_button.current"),str(end_page_num))
+            WebDriverWait(driver, 5).until(unt)
+            return True
+        except:
+            return False
+
 if __name__ =="__main__":
     """
     downed_all = list(map(str예외처리, os.listdir(pre_clean_path)))
@@ -519,8 +606,8 @@ if __name__ =="__main__":
     driver.maximize_window()
     #page_num = driver.find_elements_by_class_name("paginate_button.current")[0].text
 
-    down_start_page = 0
-    end_page_num = 1962
+    down_start_page = 1
+    end_page_num = 1963
     나머지_col = ["문서타입", "사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "주문","원심결","신청취지", "심의종결일", "파일명", "이유"]
     재결_col = ["문서타입", "사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "주문", "원심결","신청취지", "심의종결일", "파일명", "이유"]
     시정_약관_DF_col = ['문서타입', '사건번호',"의결번호",'사건명', '시정권고',"의결일", '피심인','시정권고사항', '적용법조',"파일명", '시정권고이유', '위피심인의']
@@ -531,9 +618,24 @@ if __name__ =="__main__":
     재결_DF = []
     나머지_DF = []
     오류_all = []
-    for i in range(1,end_page_num+1):
+    if down_start_page >= (end_page_num//2):
+        for i in range(end_page_num,down_start_page-1,-1):
+            while True:
+                if i == end_page_num:
+                    페이지이동 = 다음페이지로이동(driver, "마지막으로", end_page_num)
+                else:
+                    페이지이동 = 다음페이지로이동(driver,i, end_page_num)
+                if 페이지이동:
+                    break
+    else:
+        for i in range(1,down_start_page+1):
+            while True:
+                페이지이동 = 다음페이지로이동(driver,i,end_page_num)
+                if 페이지이동:
+                    break
+    for i in range(down_start_page,end_page_num+1):
         while True:
-            페이지이동 = 다음페이지로이동(driver,i)
+            페이지이동 = 다음페이지로이동(driver, i, end_page_num)
             if 페이지이동:
                 break
         while True:
@@ -550,7 +652,7 @@ if __name__ =="__main__":
             else:
                 break
 
-        if (i % 100 == 0)and (i > down_start_page):
+        if ((i % 100 == 0)and (i > down_start_page)) or (i == end_page_num):
             나머지_DF_ = pd.DataFrame.from_dict(나머지_DF).reset_index(drop=True)
             나머지_DF_= 나머지_DF_.reindex(columns=나머지_col).rename(columns={"주문": "세부조치내역"})
             나머지_DF_.to_excel(f"{pre_clean}의결서_to{i}.xlsx", encoding="UTF-8")
@@ -583,6 +685,7 @@ if __name__ =="__main__":
             재결_DF = []
             나머지_DF = []
             오류_all = []
+        i += 1
 #    with open(f'오류.pickle', 'wb') as handle:
 #        pickle.dump(오류_all, handle, protocol=pickle.HIGHEST_PROTOCOL)
 

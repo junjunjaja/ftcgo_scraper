@@ -12,8 +12,9 @@ def voca_re_make(string):
 def find_voca(string,target):
     return re.compile(string).search(target)
 
-def load_complete_ftc_file(save=False):
-    파일select = re.compile("\w+_to[0-9]{3,}\.csv")
+pre_clean_path += "/ver_1"
+def load_complete_ftc_file(save=False,제출용=True):
+    파일select = re.compile("\w+_to[0-9]{3,}\.xlsx")
     파일select = [파일select.search(i).group() for i in os.listdir(pre_clean_path) if 파일select.search(i) is not None]
     # ,usecols = list(range(0,14))
     나머지_col = ["사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "세부조치내역"]
@@ -21,10 +22,12 @@ def load_complete_ftc_file(save=False):
     시정_약관_DF_col = ['문서타입', '사건번호', "의결번호", '사건명', '시정권고', "의결일", '피심인', '시정권고사항', '적용법조']
     시정_나머지_DF_col = ['문서타입', '사건번호', "의결번호", '사건명', "대표조치유형", '의결일', '시정권고', '시정권고사항', '피심인', '법위반내용', '수락거부시조치',
                      '수락여부통지기간', '시정기한']
+    에러_col = ["다운오류","파일명변경오류","파일오류","추출오류"]
     시정나머지 = []
     시정약관 = []
     의결서 = []
     재결 = []
+    에러 = []
     for i in 파일select:
         if "나머지" in i:
             시정나머지.append(i)
@@ -34,14 +37,21 @@ def load_complete_ftc_file(save=False):
             재결.append(i)
         elif "약관" in i:
             시정약관.append(i)
+        elif "err" in i:
+            에러.append(i)
     all_df = []
-    for n, k, l in zip([나머지_col, 재결_col, 시정_약관_DF_col, 시정_나머지_DF_col], [의결서, 재결, 시정약관, 시정나머지],
-                       ["의결서", "재결", "시정약관", "시정나머지"]):
-        a = pd.concat(
-            [pd.read_csv(f"{pre_clean_path}\{i}", engine='python', encoding="UTF-8", index_col=0, verbose=True) for i in
-             k], axis=0).reset_index().reindex(columns=n)
+    for n, k, l in zip([나머지_col, 재결_col, 시정_약관_DF_col, 시정_나머지_DF_col,에러_col], [의결서, 재결, 시정약관, 시정나머지,에러],
+                       ["의결서", "재결", "시정약관", "시정나머지","err"]):
+        if 제출용:
+            a = pd.concat(
+                [pd.read_excel(f"{pre_clean_path}\{i}",encoding="UTF-8", index_col=0, verbose=True) for i in
+                 k], axis=0).reset_index().reindex(columns=n)
+        else:
+            a = pd.concat(
+                [pd.read_excel(f"{pre_clean_path}\{i}", encoding="UTF-8", index_col=0, verbose=True) for i in
+                 k], axis=0).reset_index()
         if save:
-            a.to_excel(f"{l}.xlsx")
+            a.to_excel(f"{clean_df}{l}.xlsx")
         all_df.append(a)
     return all_df
 
@@ -86,8 +96,13 @@ if __name__ == "__main__":
         except OverflowError:
             maxInt = int(maxInt / 100)
     #tickers = get_tickers()
+    load_complete_ftc_file(save=True,제출용=True)
+
     tickers = pd.read_pickle(피클경로+"tickers.pickle")
     a = pd.read_excel(clean_df+"의결서.xlsx")
+    a_ = pd.read_excel(clean_df+"재결.xlsx")
+    a = pd.concat([a,a_],axis=0)
+    del a_
     a["피심인_기업"] = a["피심인"].astype(str).apply(lambda x: firm_exist_1(x,tickers))
     a["사건명_기업"] = a["사건명"].astype(str).apply(lambda x: firm_exist_1(x, tickers))
     a["세부조치_기업"] = a["세부조치내역"].astype(str).apply(lambda x: firm_exist_1(x, tickers))
