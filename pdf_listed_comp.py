@@ -12,7 +12,6 @@ def voca_re_make(string):
 def find_voca(string,target):
     return re.compile(string).search(target)
 
-pre_clean_path += "/ver_1"
 def load_complete_ftc_file(save=False,제출용=True):
     파일select = re.compile("\w+_to[0-9]{3,}\.xlsx")
     파일select = [파일select.search(i).group() for i in os.listdir(pre_clean_path) if 파일select.search(i) is not None]
@@ -88,6 +87,7 @@ def firm_exist_2(string,tickers,strip_=False):
     else:
         return pd.NaT
 if __name__ == "__main__":
+    pre_clean_path += "/ver_1"
     maxInt = sys.maxsize
     while True:
         try:
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         except OverflowError:
             maxInt = int(maxInt / 100)
     #tickers = get_tickers()
-    load_complete_ftc_file(save=True,제출용=True)
+    load_complete_ftc_file(save=True,제출용=False)
 
     tickers = pd.read_pickle(피클경로+"tickers.pickle")
     a = pd.read_excel(clean_df+"의결서.xlsx")

@@ -4,9 +4,9 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import ElementNotInteractableException as ENIE
 from selenium.common.exceptions import UnexpectedAlertPresentException as UAP
 import time
@@ -14,7 +14,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import requests
 import json
-import lxml.html
+import lxml,html
 import re
 from pathlib import Path
 import os
@@ -22,7 +22,6 @@ import re
 import pdftotext
 import string
 from contextlib import suppress
-from selenium import webdriver
 import shutil
 from time import sleep
 
@@ -91,8 +90,20 @@ def 공정위boxcrawling(driver,pdf파일처리여부 = True):
             return True
         else:
             return False
+
+    def tablerow추출(n, tr):
+        # "//*[@id='solrList']/thead/tr/th[1]"
+        # "//*[@id='solrList']/tbody/tr[2]/td[1]"
+        if n == 0:
+            tr
+        사건번호, 의결번호, 의결일 = tr.find_elements_by_class_name("rwd_hidden")
+        사건번호, 의결번호, 의결일 = 데이터매치check(사건번호, 의결번호, 의결일)
+        사건명 = tr.find_element_by_class_name("textleft")
+        대표조치유형, 의결서 = tr.find_elements_by_class_name("dt-nowrap")
+        return {"사건번호": 사건번호, "의결번호": 의결번호, "사건명": 사건명, "대표조치유형": 대표조치유형, "의결일": 의결일}, 의결서
+
     def table추출(n,tr):
-        의결dic, 의결서 = tablerow추출(tr)
+        의결dic, 의결서 = tablerow추출(n,tr)
         lst = [i.text for i in 의결dic.values()]
         추가dic = {i: k for i, k in zip(의결dic.keys(), lst)}
         if lst[0] != "":
@@ -132,7 +143,11 @@ def 공정위boxcrawling(driver,pdf파일처리여부 = True):
     시정_나 = []
     나머지 = []
     재결 = []
-    for n,tr in enumerate(driver.find_elements_by_css_selector("tr")):
+    #Version 2 공정위 사이트 바뀜
+    table = driver.find_elements_by_xpath("//*[@id='solrList']")[0]
+    #Vesion 1
+    #for n,tr in enumerate(driver.find_elements_by_css_selector("tr")):
+    for n, tr in enumerate(table.find_elements_by_css_selector("tr")):
         if n == 0:
             ok, 의결dic, 의결서,lst, 추가dic, colnames = table추출(n, tr)
             continue
@@ -396,7 +411,6 @@ def 문서추출(file,pdf_name):
         고발_ = [r"\s+\b사 *건 *번 *호\b\s+", r"\s+\b사? *건 *명\s*:?\s*\b", ["피조사인", "신청인", "피심인"], r"\s+\b원 *심 *결\b\s+",
                r"\s+\b심 *의 *종 *결 *일\b\s+",r"위 *\w+의 *" ,r"\s+\b주 *문\b\s+", r"\s+\b신 *청 *취 *지\b\s+","\s+인 *정 *하 *는 *사 *실\s*","\s+사 *실 *의 *개 *요 *" ,r"\s+\b이 *유\b\s+",
                r"선택\s+공\s*정\s*거\s*래\s*위\s*원\s*회\s*는\s*위\s*와\s*같\s*이\s*의\s*결\s*하\s*였\s*(다|음)", r"선택\d{2,4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s+"]
-        re.compile(r"\s+공\s*정\s*거\s*래\s*위\s*원\s*회\s*는\s*위\s*와\s*같\s*이\s*의\s*결\s*하\s*였\s*(다|음)").search('└────┴────────────┴────┴────┴──┴───┴──┘ 공정거래위원회는 위와같이 의결하였다. ')
         for file_name,typ in zip(file_name_, file_type):
             if typ.search(page_one_file) is not None:
                 #print(typ.search(page_one_file), file_name)
@@ -514,19 +528,21 @@ def 데이터매치check(사건번호,의결번호,의결일):
     return new_사건번호,new_의결번호,new_의결일
 
 
-def tablerow추출(tr):
-    사건번호,의결번호,의결일 = tr.find_elements_by_class_name("rwd_hidden")
-    사건번호,의결번호,의결일 = 데이터매치check(사건번호, 의결번호, 의결일)
-    사건명 = tr.find_element_by_class_name("textleft")
-    대표조치유형,의결서 = tr.find_elements_by_class_name("dt-nowrap")
-    return {"사건번호":사건번호,"의결번호":의결번호,"사건명":사건명,"대표조치유형":대표조치유형,"의결일":의결일},의결서
 
 
 def 다음페이지로이동(driver,page,end_page_num):
     if type(page) is int:
         try:
-            driver.find_elements(By.XPATH, f"//*[@id='ltfrList_paginate']/span/a[text()='{page}']")[0].click()
+            #Todo 이후 수정하기!
+            #"//*[@id="content"]/div/div[2]/a[3]"
+            #"//*[@id="content"]/div/div[2]/span/a[2]"
+            #"//*[@id="content"]/div/div[2]/span/a[9]"
+            #"#content > div > div.dataTables_paginate.paging_full_numbers > span > a:nth-child(9)"
+            driver.find_elements(By.XPATH,f"//*[@id='content']/div/div[2]/span/a[{page}]").click()
+            #Version 1
+            #driver.find_elements(By.XPATH, f"//*[@id='ltfrList_paginate']/span/a[text()='{page}']")[0].click()
             unt = EC.text_to_be_present_in_element((By.CLASS_NAME,"paginate_button.current"),str(page))
+
             WebDriverWait(driver, 5).until(unt)
             return True
         except:
@@ -606,7 +622,7 @@ if __name__ =="__main__":
     driver.maximize_window()
     #page_num = driver.find_elements_by_class_name("paginate_button.current")[0].text
 
-    down_start_page = 1
+    down_start_page = 100
     end_page_num = 1963
     나머지_col = ["문서타입", "사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "주문","원심결","신청취지", "심의종결일", "파일명", "이유"]
     재결_col = ["문서타입", "사건번호", "의결번호", "사건명", "대표조치유형", "의결일", "피심인", "주문", "원심결","신청취지", "심의종결일", "파일명", "이유"]
@@ -628,16 +644,18 @@ if __name__ =="__main__":
                 if 페이지이동:
                     break
     else:
-        for i in range(1,down_start_page+1):
+        if down_start_page != 1:
+            for i in range(2,down_start_page+1):
+                while True:
+                    페이지이동 = 다음페이지로이동(driver,i,end_page_num)
+                    if 페이지이동:
+                        break
+    for i in range(down_start_page,end_page_num+1):
+        if down_start_page != 1:
             while True:
-                페이지이동 = 다음페이지로이동(driver,i,end_page_num)
+                페이지이동 = 다음페이지로이동(driver, i, end_page_num)
                 if 페이지이동:
                     break
-    for i in range(down_start_page,end_page_num+1):
-        while True:
-            페이지이동 = 다음페이지로이동(driver, i, end_page_num)
-            if 페이지이동:
-                break
         while True:
             if i >= down_start_page:
                 다운로드, 시정_약,시정_나,재결,나머지,오류 = 공정위boxcrawling(driver)

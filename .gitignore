@@ -15,3 +15,6 @@ pickle/
 휴장일/
 __pycache__/
 *.pdf
+Find-a지원서/
+금감원_file/
+FilePathCheckerModule/
