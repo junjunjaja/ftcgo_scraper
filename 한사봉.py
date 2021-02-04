@@ -117,7 +117,6 @@ while True:
         try:
             driver.find_element_by_xpath("""//*[@id="btn_find"]""").click()
         except:
-            time.sleep(1.5)
             무의미한클릭()
         else:
             break
@@ -127,18 +126,27 @@ while True:
         soup = BeautifulSoup(html_source, 'lxml')
         tb = soup.select("table")[0]
         t = table_parser(tb)
-        should_click = t.loc[(t["제한인원"] > t["신청인원"]) & (t["프로그램명"].apply(lambda x: True if "사전선발" not in x else False))].index.to_list()
-        print(t[["프로그램명","제한인원","신청인원"]])
+        should_click = t.loc[(t["제한인원"] > t["신청인원"]) & (t["프로그램명"].apply(lambda x: True if "선발" not in x else False)) & (t["신청제한내용"].apply(lambda x: True if "선발" not in x else False))].index.to_list()
         if len(should_click) > 0:
             for can_click_ in should_click:
-                driver.find_element_by_xpath(
-                    f"""/html/body/div[2]/div/div[2]/div/form/div/div[1]/div[3]/table/tbody/tr[{can_click_ + 1}]/td[1]/span/input""").click()  # 신청버튼 클릭
-                driver.implicitly_wait(imp_time1)
-                driver.find_element_by_xpath("""//*[@id="sincheongGyoyukSeq"]""").click()  # 소양교육일 선택
-                ActionChains(driver).send_keys(Keys.DOWN, Keys.ENTER).perform()  # 소양교육일 일자 선택
-                driver.find_element_by_xpath("""//*[@id="btn_confirm"]""").click()  # 신청버튼 클릭
-                ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+                while True:
+                    try:
+                        print(t[["프로그램명", "제한인원", "신청인원"]])
+                        driver.find_element_by_xpath(f"""/html/body/div[2]/div/div[2]/div/form/div/div[1]/div[3]/table/tbody/tr[{can_click_ + 1}]/td[1]/span/input""").click()  # 신청버튼 클릭
+                    except:
+                        무의미한클릭()
+                    else:
+                        break
+                while True:
+                    try:
+                        driver.find_element_by_xpath("""//*[@id="sincheongGyoyukSeq"]""").click()  # 소양교육일 선택
+                        ActionChains(driver).send_keys(Keys.DOWN, Keys.ENTER).perform()  # 소양교육일 일자 선택
+                        driver.find_element_by_xpath("""//*[@id="btn_confirm"]""").click()  # 신청버튼 클릭
+                        ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+                    except:
+                        ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+                        무의미한클릭()
+                    else:
+                        break
                 다시돌아가기()
-
-
 
