@@ -542,7 +542,6 @@ def 다음페이지로이동(driver,page,end_page_num):
             #Version 1
             #driver.find_elements(By.XPATH, f"//*[@id='ltfrList_paginate']/span/a[text()='{page}']")[0].click()
             unt = EC.text_to_be_present_in_element((By.CLASS_NAME,"paginate_button.current"),str(page))
-
             WebDriverWait(driver, 5).until(unt)
             return True
         except:
